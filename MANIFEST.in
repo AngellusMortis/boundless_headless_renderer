@@ -6,3 +6,5 @@ include README.rst
 include requirements.in
 
 recursive-include boundless_headless_renderer/assets *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
