@@ -1,0 +1,128 @@
+{
+  "zScale": {
+    "Value": 1.0
+  },
+  "eyeDirection": {
+    "Value": [0.00, 0.00, -1.00],
+    "Type": "float3"
+  },
+  "hdrA": {
+    "Value": 0.9,
+    "Type": "float"
+  },
+  "hdrB": {
+    "Value": 0.407,
+    "Type": "float"
+  },
+  "hdrBC": {
+    "Value": 0.19617,
+    "Type": "float"
+  },
+  "hdrDE": {
+    "Value": 0.05348,
+    "Type": "float"
+  },
+  "hdrDF": {
+    "Value": 0.14786,
+    "Type": "float"
+  },
+  "hdrEiF": {
+    "Value": 0.3617,
+    "Type": "float"
+  },
+  "hdria": {
+    "Value": 0,
+    "Type": "float"
+  },
+  "hdrib": {
+    "Value": 0,
+    "Type": "float"
+  },
+  "hdrW": {
+    "Value": 0,
+    "Type": "float"
+  },
+  "hdriW": {
+    "Value": 1.64176,
+    "Type": "float"
+  },
+  "hdrBlockLightingScale": {
+    "Value": 1.0,
+    "Type": "float"
+  },
+  "nlights": {
+    "Value": [
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+      0, 0, 0, 0,
+      0.65957, -0.48381, -0.57523, 0.00,
+      4.185, 3.64095, 3.5991, 0.00,
+      2.524, 2.524, 2.524, 0.00,
+      -0.01352, 0.47943, -0.87748, 0.00,
+      1.00000E-6, 0.81728, 1.06823, 0.00,
+      1.00000E-6, 1.00000E-6, 1.00000E-6, 0.00
+    ],
+    "Type": "float4[12]"
+  },
+  "lightingStyle": {
+    "Value": 1,
+    "Type": "int"
+  },
+  "clipPlane": {
+    "Value": [0.06494, -0.98717, -0.14586, -1E10], 
+    "Type": "float4"
+  },
+  "SpecularExponent": {
+    "Value": 32,
+    "Type": "float"
+  },
+  "directionContribution": {
+    "Value": 1,
+    "Type": "float"
+  },
+  "envContribution": {
+    "Value": 0.5,
+    "Type": "float"
+  },
+  "fallbackBlockColorSunlight": {
+    "Value": [0.0, 0.0, 0.0, 1.0],
+    "Type": "float4"
+  },
+  "worldLightDirection": {
+    "Value": [0.00, -0.425, -1.00],
+    "Type": "float3"
+  },
+  "globalEmissiveStrength": {
+    "Value": 1.0,
+    "Type": "float"
+  },
+  "envBias": {
+    "Value": [0.222, 1.16896],
+    "Type": "float2"
+  },
+  "envMips": {
+    "Value": [4.00, 0.50, 4.00, 0.356],
+    "Type": "float4"
+  },
+  "worldWrapSize": {
+    "Value": [10000.00, 0.0001],
+    "Type": "float2"
+  },
+  "blinnDecalShadeScale": {
+    "Value": 0.642,
+    "Type": "float"
+  },
+  "blinnDecalShadeOffset": {
+    "Value": 0.054,
+    "Type": "float"
+  },
+  "enableDecal": {
+    "Value": 1.0
+  },
+  "blinn_decalStrength": {
+    "Value": 1.0
+  }
+}
