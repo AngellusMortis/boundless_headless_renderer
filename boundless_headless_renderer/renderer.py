@@ -3,17 +3,17 @@ from wand.image import Image
 from math import tan, radians
 FOV = 60
 
-import utils, renderables
+from boundless_headless_renderer import utils, renderables, parse_shaders
 
 import numpy as np
-import parse_shaders
 
 from pyrr import Matrix44, Vector3
 
 class BoundlessRenderer():
-	def __init__(self, boundlesspath, ctx, args):
+	def __init__(self, boundlesspath, basedir, ctx, args):
 		# Path to a boundless installation
 		self.boundlesspath = boundlesspath
+		self.basedir = basedir
 		self.args = args
 
 		with open(self.boundlesspath + '/assets/archetypes/compiledcolorpalettelists.msgpack', 'rb') as palettefile:
@@ -30,12 +30,12 @@ class BoundlessRenderer():
 
 		with open(self.boundlesspath + "/assets/archetypes/compiledspecialmaterials.msgpack", 'rb') as specialsfile:
 			self.specials_json = utils.convert_msgpackfile(specialsfile)
-		
+
 		self.specials_names = list(map(lambda a: a["name"], self.specials_json))
 
 		# A map of all the textures we use which are constant
 		# Key is the uniform name, value is the texture object
-		self.local_tex_path = 'assets/textures/'
+		self.local_tex_path = os.path.join(self.basedir, 'assets/textures')
 		self.const_tex = {}
 		# Dynamic textures
 		self.dyn_tex = {}
@@ -64,9 +64,9 @@ class BoundlessRenderer():
 		self.buffer_cache = []
 
 		# Grab uniforms
-		with open('assets/shader_dump.json') as uniformsfile:
+		with open(os.path.join(self.basedir, 'assets/shader_dump.json')) as uniformsfile:
 			self.uniforms_json = json.load(uniformsfile)
-		
+
 	def lookat_closest(self, bounds, meshpos, midvec):
 		if self.args["style"] == "greedy":
 			mini = bounds[0] - midvec
@@ -82,7 +82,7 @@ class BoundlessRenderer():
 			projection_arr = self.projection_mat.flatten()
 			projection_trans = np.array(np.hsplit(np.array(np.split(np.array(list(projection_arr[0:4]) + list(projection_arr[4:8]) + list(projection_arr[8:12]) + list(projection_arr[12:16])), 4)), 4))
 			self.prog['projectionTransform'].write(projection_trans.astype('f4'))
-	
+
 	def set_prog(self, prog_name):
 		technique = self.shaders[prog_name]
 		self.prog = self.ctx.program(
@@ -101,9 +101,9 @@ class BoundlessRenderer():
 			)
 		else:
 			self.ctx.disable(self.ctx.BLEND)
-		
+
 		self.ctx.enable(self.ctx.DEPTH_TEST | self.ctx.CULL_FACE)
-		
+
 	def init_constant_tex2ds(self):
 		self.const_tex2d_data = [
 			# Generic
@@ -115,20 +115,20 @@ class BoundlessRenderer():
 		]
 
 		for (filename, uniform_name, internal_fmt) in self.const_tex2d_data:
-			self.init_tex_2d(self.local_tex_path + filename, uniform_name, internal_format=internal_fmt)
-	
+			self.init_tex_2d(os.path.join(self.local_tex_path, filename), uniform_name, internal_format=internal_fmt)
+
 	def init_constant_texcubes(self):
 		self.const_texcube_data = [
 			# Generic
 			("grey_cube", "fragment_reflection_env_map"),
 		]
 
-		for (dir, uniform_name) in self.const_texcube_data:
-			self.init_tex_cube(self.local_tex_path + dir, uniform_name)
-		
+		for (dirname, uniform_name) in self.const_texcube_data:
+			self.init_tex_cube(os.path.join(self.local_tex_path, dirname), uniform_name)
+
 	def load_const_uniforms(self):
 		from collections.abc import Iterable
-		
+
 		self.add_constant_tex_uniforms()
 		for u_name, u_val in self.uniforms_json.items():
 			val = u_val['Value']
@@ -164,14 +164,14 @@ class BoundlessRenderer():
 				# Texture is used in the current shader
 				self.prog[uniform_name].value = self.prog[uniform_name].location
 				tex.use(self.prog[uniform_name].location)
-	
+
 	def add_dyn_tex_uniforms(self):
 		for uniform_name, tex in self.dyn_tex.items():
 			if self.prog.get(uniform_name, default=None):
 				# Texture is used in the current shader
 				self.prog[uniform_name].value = self.prog[uniform_name].location
 				tex.use(self.prog[uniform_name].location)
-	
+
 	def init_tex_2d(self, path, uniform_name, from_boundlessdir=False, constant=True, internal_format=None):
 		# Some 2D texture imports will be from the local boundless installation
 		# E.g diffuse maps, specular maps etc
@@ -190,7 +190,7 @@ class BoundlessRenderer():
 			self.const_tex[uniform_name] = tex
 		else:
 			self.dyn_tex[uniform_name] = tex
-	
+
 	def init_block_tex_2d(self, toppath, sidepath, uniform_name, internal_format=None):
 		toppath = "/assets/".join([self.boundlesspath, toppath]) if toppath else toppath
 		sidepath = "/assets/".join([self.boundlesspath, sidepath]) if sidepath else sidepath
@@ -206,7 +206,7 @@ class BoundlessRenderer():
 		tex.build_mipmaps()
 
 		self.dyn_tex[uniform_name] = tex
-	
+
 	def init_tex_cube(self, dir, uniform_name, constant=True):
 		"""
 		The different surfaces of the cubemap
@@ -234,7 +234,7 @@ class BoundlessRenderer():
 			surface = Image(filename=(dir + '/' + "main surface ({}).dds".format(surface_name)))
 			cubemap += bytes(surface.export_pixels())
 			if not surfacesize: surfacesize = surface.size
-		
+
 		tex = self.ctx.texture_cube(surfacesize, 4, data=cubemap)
 
 		if constant:
@@ -243,7 +243,7 @@ class BoundlessRenderer():
 			self.const_tex[uniform_name] = tex
 		else:
 			self.dyn_tex[uniform_name] = tex
-	
+
 	BLOCK_MODEL_PATH = "locator_templates/models/template_block.dae"
 	def scenes_from_renderables(self, r):
 		from pyrr import Matrix44
@@ -290,7 +290,7 @@ class BoundlessRenderer():
 				loc_ammo = matrix_from_loc(
 					model_json["nodes"][root_node]["nodes"].get(loc_ammo_key)
 				)
-			
+
 			locator_path = utils.get_locator(renderable.categories, self.boundlesspath) if renderable.type_name != "BLOCK" else model_path
 			if not locator_path and not self.args["quiet"]: print("[WARN] Missing locator template for {}".format(renderable.name))
 			else:
@@ -299,7 +299,7 @@ class BoundlessRenderer():
 					.format(locator_path), 'rb'
 				) as loc_file:
 					loc_json = utils.convert_msgpackfile(loc_file)
-			
+
 				assert len(loc_json["nodes"]) == 1
 				loc_root_node = list(loc_json["nodes"].keys())[0]
 				if loc_json["nodes"][loc_root_node].get("nodes"):
@@ -338,9 +338,9 @@ class BoundlessRenderer():
 				assert(len(ammo_json["nodes"].keys()) == 1)
 				ammo_root = list(ammo_json["nodes"].keys())[0]
 				assert(ammo_json["nodes"][ammo_root].get("geometryinstances"))
-				
+
 				scene.add_ammo(ammo_root, ammo_json["nodes"][ammo_root], ammo_json, self.boundlesspath)
-		
+
 			scene.calculate_bounds()
 			scenes[id] = scene
 
@@ -373,23 +373,23 @@ class BoundlessRenderer():
 		binorm_indices = arrays["BINORMAL"]["indices"]
 		tang_vertices = arrays["TANGENT"]["data"]
 		tang_indices = arrays["TANGENT"]["indices"]
-		
+
 		pos_multi = np.array(np.split(pos_vertices, len(pos_vertices)//3))
 		pos_monolith = pos_multi[pos_indices].flatten()
 		blk_pos_buf = self.ctx.buffer(pos_monolith.astype('f4').tobytes())
-		
+
 		uv_multi = np.array(np.split(uv_vertices, len(uv_vertices)//2))
 		uv_monolith = uv_multi[uv_indices].flatten()
 		blk_uv_buf = self.ctx.buffer(uv_monolith.astype('f4').tobytes())
-		
+
 		norm_multi = np.array(np.split(norm_vertices, len(norm_vertices)//3))
 		norm_monolith = norm_multi[norm_indices].flatten()
 		blk_norm_buf = self.ctx.buffer(norm_monolith.astype('f4').tobytes())
-		
+
 		binorm_multi = np.array(np.split(binorm_vertices, len(binorm_vertices)//3))
 		binorm_monolith = binorm_multi[binorm_indices].flatten()
 		blk_binorm_buf = self.ctx.buffer(binorm_monolith.astype('f4').tobytes())
-		
+
 		tang_multi = np.array(np.split(tang_vertices, len(tang_vertices)//3))
 		tang_monolith = tang_multi[tang_indices].flatten()
 		blk_tang_buf = self.ctx.buffer(tang_monolith.astype('f4').tobytes())
@@ -429,7 +429,7 @@ class BoundlessRenderer():
 				side_path = "textures/{}/{}_{}.dds".format(atlaspath, file_prefix, renderable.side_tex.id)
 				self.init_block_tex_2d(top_path, side_path, uniform_name, internal_format=fmt)
 			self.init_block_tex_2d(None, None, "decal_gradient_mask")
-	
+
 			assert(len(renderable.top_decals) == len(renderable.side_decals))
 			for top_decal, side_decal in zip(renderable.top_decals, renderable.side_decals):
 				atlaspath = atlases[renderable.tex_atlas]
@@ -441,7 +441,7 @@ class BoundlessRenderer():
 					side_decal.id = self.specials_json[side_decal.id]["textures"][0]
 					atlaspath = "specialmaterialsatlas"
 				if not side_decal.special: atlaspath = "alphablockatlas"
-				
+
 				from copy import deepcopy
 				decal_node = renderables.Node([], node.name + "_decal", [deepcopy(node.meshes[0])], node.transform)
 				decal_cutout_node = renderables.Node([], node.name + "_decalcut", [deepcopy(node.meshes[0])], node.transform)
@@ -469,7 +469,7 @@ class BoundlessRenderer():
 					}
 				self.deferred_decal.append(decal_node)
 				self.deferred_decal.append(decal_cutout_node)
-		
+
 		def load_decal_material(renderer, material):
 			expected = {
 				"diffuse": None,
@@ -560,23 +560,23 @@ class BoundlessRenderer():
 					binorm_indices = arrays["BINORMAL"]["indices"]
 					tang_vertices = arrays["TANGENT"]["data"]
 					tang_indices = arrays["TANGENT"]["indices"]
-					
+
 					pos_multi = np.array(np.split(pos_vertices, len(pos_vertices)//3))
 					pos_monolith = pos_multi[pos_indices].flatten()
 					pos_buf = self.ctx.buffer(pos_monolith.astype('f4').tobytes())
-					
+
 					uv_multi = np.array(np.split(uv_vertices, len(uv_vertices)//2))
 					uv_monolith = uv_multi[uv_indices].flatten()
 					uv_buf = self.ctx.buffer(uv_monolith.astype('f4').tobytes())
-					
+
 					norm_multi = np.array(np.split(norm_vertices, len(norm_vertices)//3))
 					norm_monolith = norm_multi[norm_indices].flatten()
 					norm_buf = self.ctx.buffer(norm_monolith.astype('f4').tobytes())
-					
+
 					binorm_multi = np.array(np.split(binorm_vertices, len(binorm_vertices)//3))
 					binorm_monolith = binorm_multi[binorm_indices].flatten()
 					binorm_buf = self.ctx.buffer(binorm_monolith.astype('f4').tobytes())
-					
+
 					tang_multi = np.array(np.split(tang_vertices, len(tang_vertices)//3))
 					tang_monolith = tang_multi[tang_indices].flatten()
 					tang_buf = self.ctx.buffer(tang_monolith.astype('f4').tobytes())
@@ -594,7 +594,7 @@ class BoundlessRenderer():
 					vao.bind(2, 'f', blk_tang_buf, '3f4')
 					vao.bind(3, 'f', blk_binorm_buf, '3f4')
 					vao.bind(4, 'f', blk_uv_buf, '2f4')
-				
+
 				vao.render(mode=moderngl.TRIANGLES)
 
 				if not cutout and not decalpass:
@@ -606,7 +606,7 @@ class BoundlessRenderer():
 					for n in self.deferred_decal:
 						render_node(n, decalpass=True)
 					self.deferred_decal = []
-		
+
 		render_node(scene.root)
 
 		out = Image(width=self.render_size[0], height=self.render_size[1])
@@ -719,7 +719,7 @@ class BoundlessRenderer():
 				self.lookat_closest(scene.bounds, meshpos, midvec)
 				self.model_mat = Matrix44.from_translation(meshpos) * Matrix44.from_translation(-midvec) * transform
 				self.load_dyn_uniforms()
-				
+
 				# The only thing which needs this is the atlas
 				try:
 					self.prog["modelViewOffset"].value = tuple(meshpos)
@@ -770,23 +770,23 @@ class BoundlessRenderer():
 					binorm_indices = arrays["BINORMAL"]["indices"]
 					tang_vertices = arrays["TANGENT"]["data"]
 					tang_indices = arrays["TANGENT"]["indices"]
-					
+
 					pos_multi = np.array(np.split(pos_vertices, len(pos_vertices)//3))
 					pos_monolith = pos_multi[pos_indices].flatten()
 					pos_buf = self.ctx.buffer(pos_monolith.astype('f4').tobytes())
-					
+
 					uv_multi = np.array(np.split(uv_vertices, len(uv_vertices)//2))
 					uv_monolith = uv_multi[uv_indices].flatten()
 					uv_buf = self.ctx.buffer(uv_monolith.astype('f4').tobytes())
-					
+
 					norm_multi = np.array(np.split(norm_vertices, len(norm_vertices)//3))
 					norm_monolith = norm_multi[norm_indices].flatten()
 					norm_buf = self.ctx.buffer(norm_monolith.astype('f4').tobytes())
-					
+
 					binorm_multi = np.array(np.split(binorm_vertices, len(binorm_vertices)//3))
 					binorm_monolith = binorm_multi[binorm_indices].flatten()
 					binorm_buf = self.ctx.buffer(binorm_monolith.astype('f4').tobytes())
-					
+
 					tang_multi = np.array(np.split(tang_vertices, len(tang_vertices)//3))
 					tang_monolith = tang_multi[tang_indices].flatten()
 					tang_buf = self.ctx.buffer(tang_monolith.astype('f4').tobytes())
@@ -811,7 +811,7 @@ class BoundlessRenderer():
 					if len(self.buffer_cache) > 6: self.buffer_cache.pop(0)
 
 				vao.render(mode=moderngl.TRIANGLES)
-			
+
 			if len(self.deferred_alpha) > 1 and not self.args["quiet"]: print("[WARN] Deferred {} alpha nodes".format(len(self.deferred_alpha)))
 			if not deferred:
 				for node in self.deferred_alpha:
@@ -827,13 +827,13 @@ class BoundlessRenderer():
 		dirpath = "out/" + scene.name
 		os.makedirs(dirpath, exist_ok=True)
 		out.save(filename=(dirpath + "/{}_{}".format(basepaletteindex, decalpaletteindex) + ".png"))
-	
+
 	def discover_items(self):
 		with open(self.boundlesspath + "/assets/archetypes/compileditems.msgpack", 'rb') as itemsfile:
 			items_json = utils.convert_msgpackfile(itemsfile)
 
 		discovered = {}
-		
+
 		for id, data in items_json.items():
 			if data:
 				id_check = (self.args["id"] and data["id"] == self.args["id"]) or not self.args["id"]
@@ -857,13 +857,13 @@ class BoundlessRenderer():
 				if ((self.args["id"] and id == self.args["id"]) or not self.args["id"]) or ((self.args["name"] and data["name"] == self.args["name"]) or not self.args["name"]): discovered[id] = item
 
 		return discovered
-	
+
 	def discover_props(self):
 		with open(self.boundlesspath + "/assets/archetypes/compiledblocks.msgpack", 'rb') as blocksfile:
 			blocks_json = utils.convert_msgpackfile(blocksfile)
 
 		discovered = {}
-		
+
 		for data in blocks_json["BlockTypesData"]:
 			if data:
 				id_check = (self.args["id"] and data["id"] == self.args["id"]) or not self.args["id"]
@@ -880,11 +880,11 @@ class BoundlessRenderer():
 				if ((self.args["id"] and id == self.args["id"]) or not self.args["id"]) or ((self.args["name"] and data["name"] == self.args["name"]) or not self.args["name"]): discovered[data["id"]] = prop
 
 		return discovered
-	
+
 	def discover_blocks(self):
 		with open(self.boundlesspath + "/assets/archetypes/compiledblocks.msgpack", 'rb') as blocksfile:
 			blocks_json = utils.convert_msgpackfile(blocksfile)
-		
+
 		discovered = {}
 		dugups = []
 
@@ -915,7 +915,7 @@ class BoundlessRenderer():
 						decal_data["faceTextureIndices"][2][0],
 						decal_data["specialMaterial"]
 					))
-			
+
 			block = renderables.RenderableBlock(data["id"], name, base_palette, decal_palette, tex_atlas, top_tex, side_tex, top_decals, side_decals)
 			return block
 
@@ -928,7 +928,7 @@ class BoundlessRenderer():
 				discovered[data["id"]] = block
 			elif data and data["dugup"] and (data["id"] == data["analyticsType"]) and id_check and name_check:
 				dugups.append(data["dugup"])
-		
+
 		for data in blocks_json["BlockTypesData"]:
 			if data and data["id"] in dugups and data["canGive"] and ((data["treeFoliage"] and self.args["force_foliage"]) or not data["treeFoliage"]):
 				block = get_block(data)

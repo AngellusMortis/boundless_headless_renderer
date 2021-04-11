@@ -1,8 +1,15 @@
-if __name__ == "__main__":
-	from renderer import BoundlessRenderer
-	import moderngl, os
-	import argparse
+from boundless_headless_renderer.renderer import BoundlessRenderer
+import moderngl, os
+import argparse
 
+def dir_path(string):
+    if os.path.isdir(string):
+        return string
+    else:
+        raise NotADirectoryError(string)
+
+
+def main():
 	parser = argparse.ArgumentParser(description='Boundless Icon Renderer by @willcrutchley')
 	parser.add_argument("-s", "--style", choices=["uniform", "greedy"], default="greedy", required=False)
 	parser.add_argument("-r", "--resolution", required=True, help="Specify the render resolution (e.g 256 for a 256x256 image)")
@@ -10,6 +17,7 @@ if __name__ == "__main__":
 	parser.add_argument("-o", "--overwrite", action="store_true", help="Renders all specified objects even if their image already exists in the output directory")
 	parser.add_argument("--force-foliage", action="store_true", help="Forces the rendering of blocks with treeFoliage (disabled by default since the script does not correctly render these)")
 	parser.add_argument("-q", "--quiet", action="store_true", help="No printing")
+	parser.add_argument("-g", "--boundless-path", required=True, help="Path to MacOS Boundless install", type=dir_path)
 
 	render_group = parser.add_argument_group(title="What to render", description="Pick a specific ID or NAME or one or more of [--items, --blocks, --props]")
 	render_override = render_group.add_mutually_exclusive_group()
@@ -19,7 +27,7 @@ if __name__ == "__main__":
 	render_group.add_argument("-p", "--props", action="store_true", help="Render all props")
 	render_group.add_argument("-b", "--blocks", action="store_true", help="Render all blocks")
 
-	colour_group = parser.add_argument_group(title="Colouration", 
+	colour_group = parser.add_argument_group(title="Colouration",
 		description=
 		"""
 		By default the script will render all colour/decal colour combinations.
@@ -35,12 +43,11 @@ if __name__ == "__main__":
 	if not (args.items or args.props or args.blocks) and not (args.id or args.name):
 		parser.error('Specify at least one type of object to render (--items, --props, --blocks)')
 
-	with open("assets/boundless_path") as path:
-		path = path.read().rstrip('\n')	
+	os.environ["BOUNDLESS_PATH"] = argvars["boundless_path"]
 
 	ctx = moderngl.create_context(standalone=True)
 
-	renderer = BoundlessRenderer(path, ctx, argvars)
+	renderer = BoundlessRenderer(os.environ["BOUNDLESS_PATH"], os.path.dirname(__file__), ctx, argvars)
 	scenes = {}
 	if argvars["items"] or argvars["id"] or argvars["name"]:
 		items = renderer.discover_items()
@@ -80,3 +87,8 @@ if __name__ == "__main__":
 			for b in range(0, len(base_ids)):
 				for d in range(0, len(decal_ids)):
 					renderer.render_scene(scene, b if not base_override else int(argvars["base_colour"]), d if not decal_override else int(argvars["decal_colour"]))
+
+
+
+if __name__ == "__main__":
+	main()

@@ -1,5 +1,11 @@
 import json
-import os	
+import os
+
+SHADER_FILES = [
+	"voxel.tzfx.json",
+	"skylight.tzfx.json",
+]
+
 
 class ShaderTechnique():
 	def __init__(self, vertex, fragment, params, state):
@@ -9,9 +15,10 @@ class ShaderTechnique():
 		self.state = state
 
 def get_shaders():
+	base_dir = os.path.join(os.environ["BOUNDLESS_PATH"], 'assets/shaders/macosx')
 	shaders = {}
-	for file in os.listdir('assets/shaders/macosx'):
-		with open("assets/shaders/macosx/" + file) as shader_file:
+	for filename in SHADER_FILES:
+		with open(os.path.join(base_dir, filename)) as shader_file:
 			shader_json = json.load(shader_file)
 			techniques = shader_json['techniques']
 			for ident, tech in techniques.items():

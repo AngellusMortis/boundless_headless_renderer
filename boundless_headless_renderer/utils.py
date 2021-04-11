@@ -23,13 +23,13 @@ def gen_cmap(top, side):
 	else:
 		img.paste(blank, (384, 768))
 		img.paste(blank, (128, 768))
-	
+
 	return img
 
 def transform(obj, keys):
     if isinstance(obj, bytes):
         return obj.decode('utf-8')
-    
+
     if isinstance(obj, list):
         return [transform(element, keys) for element in obj]
     elif isinstance(obj, dict):
@@ -43,12 +43,12 @@ def convert_msgpack(file):
 
 def convert_msgpackfile(file):
 	data = msgpack.unpack(file, strict_map_key=False)
-		
+
 	json_obj = data[0]
 	keys = data[1]
 
 	out = transform(json_obj, keys)
-	
+
 	return out
 
 def correctDecimal(dec):
@@ -58,12 +58,12 @@ def correctDecimal(dec):
 	b = (int(hex_colour, 16) & 0xFF0000) >> 16
 	g = (int(hex_colour, 16) & 0x00FF00) >> 8
 	r = int(hex_colour, 16) & 0x0000FF
-	
+
 	corrected = [r, g, b]
 
 	return (int(corrected[0]) << 16) | (int(corrected[1]) << 8) | int(corrected[2])
 
-def find(element, JSON, path, all_paths):    
+def find(element, JSON, path, all_paths):
   if element in JSON:
     path = path + element
     all_paths.append(path)
@@ -75,13 +75,13 @@ def get_locator(categories, boundless_path):
 	with open(boundless_path + '/assets/archetypes/locatortemplates.json') as loc_templates, open(boundless_path + '/assets/archetypes/categoryhierarchy.json') as hierarchy:
 		loc_templates_json = json.load(loc_templates)
 		hierarchy_json = json.load(hierarchy)
-	
+
 	paths = []
 	for category in categories:
 		all_paths = []
 		find(category,hierarchy_json,'',all_paths)
 		paths += all_paths
-	
+
 	results = {}
 	found = False
 	for path, categories in loc_templates_json:
@@ -96,7 +96,7 @@ def get_locator(categories, boundless_path):
 		if f >= len(categories):
 			results[path] = (bias, len(categories))
 			found = True
-	
+
 	best = None
 	best_len = 0
 	for k, (b, v) in results.items():
@@ -111,5 +111,5 @@ def get_locator(categories, boundless_path):
 			best = b
 			best_len = v
 			out = k
-		
+
 	return out if found else None
