@@ -3,7 +3,7 @@ if __name__ == "__main__":
 	import moderngl, os
 	import argparse
 
-	parser = argparse.ArgumentParser(description='Boundless Icon Renderer')
+	parser = argparse.ArgumentParser(description='Boundless Icon Renderer by @willcrutchley')
 	parser.add_argument("-s", "--style", choices=["uniform", "greedy"], default="greedy", required=False)
 	parser.add_argument("-r", "--resolution", required=True, help="Specify the render resolution (e.g 256 for a 256x256 image)")
 	parser.add_argument("-a", "--anti-alias", action="store_true", help="Renders at a slightly higher resolution and then downscales (helps to clean up edges)")
